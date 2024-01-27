@@ -1,43 +1,60 @@
 import React from 'react';
+import './App.css';
 
 const App = () => {
 
-  const [messages, setMessages] = React.useState([]);
-  const [text, setText] = React.useState('');
   const socket = React.useMemo(() => new WebSocket('wss://0o8ik0qlcg.execute-api.ap-south-1.amazonaws.com/dev'), []);
+  const [text, setText] = React.useState('');
+  const [messages, setMessages] = React.useState([]);
+  const userId = React.useMemo(() => Math.floor(Math.random() * Number(Date.now().toString())), []);
+  const messagesContainerRef = React.useRef(null);
 
-  React.useEffect(() => {
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setMessages([...messages, data?.message]);
-    };
-  }, [messages]);
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    socket.send(text);
+  const onSubmit = (e) => {
+    e.preventDefault();
+    socket?.send(JSON.stringify({ userId, text }));
     setText('');
   };
 
+  React.useEffect(() => {
+    if (!socket) return;
+    socket.onmessage = (e) => {
+      setMessages((prev) => [JSON.parse(e.data), ...prev]);
+    };
+    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+  }, [socket, messages]);
+
   return (
-    <>
-      <form onSubmit={handleSubmit} className="form">
-        <input
-          type="text"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          className="input"
-        />
-        <button type="submit" className="button">
-          Send
-        </button>
-      </form>
-      <div>
-        {messages?.map((message, index) => (
-          <p key={index}>{message}</p>
-        ))}
+    <div className="container">
+      <div className="chat-container">
+        <div ref={messagesContainerRef} className="messages-container">
+          {messages.length === 0 ? (
+            <p className="empty-message">No messages yet. Start the conversation!</p>
+          ) : (
+            messages.map((message, index) => (
+              <div
+                className={`message ${userId === message?.userId ? 'own-message' : 'other-message'}`}
+                key={index}
+              >
+                {message?.text}
+              </div>
+            ))
+          )}
+        </div>
+        <form className="form" onSubmit={onSubmit}>
+          <input
+            className="input"
+            type="text"
+            required
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Enter message here.."
+          />
+          <button className="button" type="submit">
+            Send
+          </button>
+        </form>
       </div>
-    </>
+    </div>
   );
 };
 

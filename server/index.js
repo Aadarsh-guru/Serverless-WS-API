@@ -1,18 +1,24 @@
 import { ApiGatewayManagementApi } from '@aws-sdk/client-apigatewaymanagementapi';
+import { Redis } from "ioredis";
 
 export const handler = async (event) => {
 
   const connectionId = event.requestContext.connectionId;
   const route = event.requestContext.routeKey;
   const response = { statusCode: 200, body: '' };
+  const redisClient = new Redis(process.env.REDIS_URL);
 
   if (route === '$connect') {
-    console.log(`Client connected: ${connectionId}`);
+    // Store connectionId in Redis on connection
+    await redisClient.sadd('connected_clients', connectionId);
+    response.body = 'Connected';
     return response;
   }
 
   if (route === '$disconnect') {
-    console.log(`Client disconnected: ${connectionId}`);
+    // Delete connectionId from Redis on disconnection
+    await redisClient.srem('connected_clients', connectionId);
+    response.body = 'Disconnected';
     return response;
   }
 
@@ -22,12 +28,20 @@ export const handler = async (event) => {
       endpoint: `https://${event.requestContext.domainName}/${event.requestContext.stage}`
     });
 
-    await client.postToConnection({
-      ConnectionId: connectionId,
-      Data: JSON.stringify({ message: event.body }),
+    // Get all connected connectionIds from Redis
+    const connectedClients = await redisClient.smembers('connected_clients');
+
+    // Send the message to all connected clients
+    const sendMessagePromises = connectedClients.map(async (clientId) => {
+      await client.postToConnection({
+        ConnectionId: clientId,
+        Data: event.body,
+      });
     });
+
+    // Wait for all messages to be sent before returning the response
+    await Promise.all(sendMessagePromises);
 
     return response;
   }
 };
-

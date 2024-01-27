@@ -4,3 +4,4 @@ server/jspm_packages
 server/.serverless
 client/node_modules
 client/dist
+server/.env
