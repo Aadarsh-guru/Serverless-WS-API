@@ -1,0 +1,27 @@
+service: ws-api
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-south-1
+  iamRoleStatements:
+  - Effect: Allow
+    Action:
+      - lambda:InvokeFunction
+      - execute-api:ManageConnections
+    Resource: "arn:aws:execute-api:ap-south-1:*:/*"
+
+plugins:
+  - serverless-offline
+  
+functions:
+  websocket:
+    handler: index.handler
+    events:
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+      - websocket:
+          route: $default
